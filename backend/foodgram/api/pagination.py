@@ -1,8 +1,8 @@
 from rest_framework.pagination import PageNumberPagination
 
 
-class CustomPagination(PageNumberPagination):
-    """Custom pagination class for the API."""
+class SitePagination(PageNumberPagination):
+    """Pagination class for recipes and users."""
 
     page_size = 6
     page_size_query_param = "limit"

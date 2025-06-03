@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from recipes.models import Ingredient, IngredientRecipe
+from recipes.models import Ingredient, RecipeIngredient
 
 
 class IngredientSerializer(serializers.ModelSerializer):
@@ -11,7 +11,7 @@ class IngredientSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "measurement_unit")
 
 
-class IngredientRecipeReadSerializer(serializers.ModelSerializer):
+class RecipeIngredientReadSerializer(serializers.ModelSerializer):
     """Serializer for reading ingredient recipes"""
 
     id = serializers.IntegerField(source="ingredient.id")
@@ -21,11 +21,11 @@ class IngredientRecipeReadSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = IngredientRecipe
+        model = RecipeIngredient
         fields = ("id", "name", "measurement_unit", "amount")
 
 
-class IngredientRecipeWriteSerializer(serializers.ModelSerializer):
+class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
     """Serializer for writing ingredient recipes"""
 
     id = serializers.PrimaryKeyRelatedField(
@@ -38,5 +38,5 @@ class IngredientRecipeWriteSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = IngredientRecipe
+        model = RecipeIngredient
         fields = ("id", "amount")

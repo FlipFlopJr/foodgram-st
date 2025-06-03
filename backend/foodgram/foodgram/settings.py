@@ -25,7 +25,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "djoser",
     "recipes.apps.RecipesConfig",
-    "users.apps.UsersConfig",
+    'recipes',
     "api.apps.ApiConfig",
 ]
 
@@ -74,13 +74,6 @@ DATABASES = {
     }
 }
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db.sqlite3",
-#     }
-# }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -104,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-ru"  # en-us
 
 TIME_ZONE = "UTC"
 
@@ -147,4 +140,4 @@ DJOSER = {
     },
 }
 
-AUTH_USER_MODEL = "users.User"
+AUTH_USER_MODEL = "recipes.User"
