@@ -1,7 +1,7 @@
 from datetime import datetime
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError, NotAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from django.db.models import Sum
+from django_filters.rest_framework import DjangoFilterBackend
 
 from recipes.models import RecipeModel, FavoriteRecipeModel, ShoppingCart
 from api.serializers.recipes import (
@@ -16,25 +17,17 @@ from api.serializers.recipes import (
     WriteRecipeSerializer,
     ShortRecipeSerializer,
 )
-from api.permissions import IsStaffOrAuthorOrReadOnly
-from api.pagination import PaginationSite
+from api.permissions import ReadOnlyOrIsAuthor
+from api.pagination import PaginationClass
 from api.filters import FilterRecipeModel
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = RecipeModel.objects.all()
     filterset_class = FilterRecipeModel
-    pagination_class = PaginationSite
+    pagination_class = PaginationClass
     filter_backends = [DjangoFilterBackend]
-
-    def get_permissions(self):
-        if self.action in ["list", "retrieve", "get_link_to_recipe"]:
-            permission_classes = [AllowAny]
-        elif self.action == "create":
-            permission_classes = [IsAuthenticated]
-        else:
-            permission_classes = [IsAuthenticated, IsStaffOrAuthorOrReadOnly]
-        return [permission() for permission in permission_classes]
+    permission_classes = (ReadOnlyOrIsAuthor,)
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
@@ -42,43 +35,51 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return WriteRecipeSerializer
 
     def perform_create(self, serializer):
+        if not self.request.user.is_authenticated:
+            raise NotAuthenticated("Authentication needed")
+
         serializer.save(author=self.request.user)
 
-    def create(self, request, *args, **kwargs):
-        write_serializer = self.get_serializer(data=request.data)
-        write_serializer.is_valid(raise_exception=True)
-        self.perform_create(write_serializer)
-        read_serializer = ReadRecipeSerializer(
-            context=self.get_serializer_context(),
-            instance=write_serializer.instance
-        )
-        headers = self.get_success_headers(read_serializer.data)
-        return Response(
-            read_serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers,
-        )
-
-    def update(self, request, *args, **kwargs):
-        recipe = self.get_object()
-        write_serializer = self.get_serializer(
-            recipe, data=request.data, partial=True
-        )
-        write_serializer.is_valid(raise_exception=True)
-        self.perform_update(write_serializer)
-        read_serializer = ReadRecipeSerializer(
-            context=self.get_serializer_context(),
-            instance=write_serializer.instance,
-        )
-        return Response(read_serializer.data)
-
     @action(methods=["get"], detail=True, url_path="get-link")
-    def get_link_to_recipe(self, request, pk):
-        recipe = get_object_or_404(RecipeModel, pk=pk)
-        relative_link = reverse("short-link-redirect", args=[recipe.id])
+    def link_to_recipe(self, request, pk):
+        get_object_or_404(RecipeModel, pk=pk)
+        relative_link = reverse("recipes:short-link-redirect", args=[pk])
         absolute_link = request.build_absolute_uri(relative_link)
 
         return Response({"short-link": absolute_link})
+
+    def _process_recipe_connection(self,
+                                   request, recipe_id, model_class, already_exists_message
+                                   ):
+
+        recipe = get_object_or_404(RecipeModel, pk=recipe_id)
+
+        current_user = request.user
+
+        if request.method == "POST":
+            _, created = model_class.objects.get_or_create(
+                user=current_user, recipe=recipe
+            )
+
+            if not created:
+                raise ValidationError({"errors": already_exists_message})
+
+            return Response(
+                ShortRecipeSerializer(recipe).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        relation = model_class.objects.filter(
+            user=current_user, recipe=recipe
+        ).first()
+
+        if not relation:
+            raise ValidationError(
+                f"Recipe isn't found in {model_class._meta.verbose_name_plural}"
+            )
+
+        relation.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=True,
@@ -86,31 +87,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def favorite(self, request, pk=None):
-        current_user = request.user
-        recipe = get_object_or_404(RecipeModel, pk=pk)
-
-        if request.method == "POST":
-            _, created = FavoriteRecipeModel.objects.get_or_create(
-                user=current_user, recipe=recipe
-            )
-
-            if not created:
-                return Response(
-                    {"errors": "You’ve already added this recipe to favorites."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            serializer = ShortRecipeSerializer(recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        if not FavoriteRecipeModel.objects.filter(user=current_user, recipe=recipe).exists():
-            return Response(
-                {"errors": "You haven’t added this recipe to favorites yet."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        FavoriteRecipeModel.objects.filter(user=current_user, recipe=recipe).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return self._process_recipe_connection(
+            request, pk, FavoriteRecipeModel, "Recipe is already favorited"
+        )
 
     @action(
         detail=True,
@@ -118,57 +97,34 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def shopping_cart(self, request, pk=None):
-        recipe = get_object_or_404(RecipeModel, id=pk)
-        user = request.user
-
-        if request.method == "POST":
-            _, created = ShoppingCart.objects.get_or_create(
-                user=user, recipe=recipe
-            )
-
-            if not created:
-                return Response(
-                    {"errors": "You've already added this recipe to your cart."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            serializer = ShortRecipeSerializer(recipe)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        if not ShoppingCart.objects.filter(user=user, recipe=recipe).exists():
-            return Response(
-                {"errors": "Recipe not added to cart yet."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        ShoppingCart.objects.filter(user=user, recipe=recipe).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return self._process_recipe_connection(
+            request, pk, ShoppingCart, "recipe is already in shopping cart"
+        )
 
     @action(
         detail=False, permission_classes=[IsAuthenticated], methods=["get"]
     )
-    def shopping_cart_download(self, request):
-        recipes = RecipeModel.objects.filter(
-            shoppingcart_relations__user=request.user
-        )
+    def install_shopping_cart(self, request):
+        from rest_framework.exceptions import ValidationError
+        from django.http import FileResponse
+        import io
+
+        recipes = RecipeModel.objects.filter(shoppingcarts__user=request.user)
 
         if not recipes.exists():
-            return Response(
-                {"errors": "Cart is currently empty"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            raise ValidationError({"errors": "Shopping cart is empty"})
 
         ingredients = (
             recipes.values(
                 "ingredients__name", "ingredients__unit_of_measure"
             )
-            .annotate(total_amount=Sum("recipe_ingredients__count"))
+            .annotate(total_count=Sum("recipe_ingredients__count"))
             .order_by("ingredients__name")
         )
 
         current_date = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         shopping_list = [
-            "Foodgram - Shopping List",
+            "Foodgram - Shopping Cart",
             f"Date: {current_date} UTC",
             f"User: {request.user.username}",
             "",
@@ -177,21 +133,30 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         for i, ingredient in enumerate(ingredients, 1):
             shopping_list.append(
-                f"{i}. {ingredient['ingredients__name']} - "
-                f"{ingredient['total_amount']} "
+                f"{i}. {ingredient['ingredients__name'].title()} - "
+                f"{ingredient['total_count']} "
                 f"{ingredient['ingredients__unit_of_measure']}"
             )
 
         shopping_list.append("")
+        shopping_list.append("Recipes:")
+
+        for recipe in recipes:
+            shopping_list.append(
+                f"- {recipe.name} (Author: {recipe.author.get_full_name()})"
+            )
+
+        shopping_list.append("")
         shopping_list.append(
-            f"Foodgram - Your Recipes Helper © {datetime.now().year}"
+            f"Foodgram - Your cooking helper © {datetime.now().year}"
         )
 
-        response = HttpResponse(
-            "\n".join(shopping_list), content_type="text/plain; charset=utf-8"
-        )
-        response["Content-Disposition"] = (
-            "attachment; " 'filename="shopping_list.txt"'
-        )
+        content = ("\n".join(shopping_list)).encode("utf-8")
+        file = io.BytesIO(content)
 
-        return response
+        return FileResponse(
+            file,
+            as_attachment=True,
+            filename="shopping_list.txt",
+            content_type="text/plain; charset=utf-8",
+        )

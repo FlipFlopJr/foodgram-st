@@ -1,7 +1,7 @@
 from rest_framework.pagination import PageNumberPagination
 
 
-class PaginationSite(PageNumberPagination):
+class PaginationClass(PageNumberPagination):
     """Класс Пагинации"""
 
     page_size = 8

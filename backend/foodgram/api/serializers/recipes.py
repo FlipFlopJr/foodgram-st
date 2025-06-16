@@ -46,7 +46,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         )
         fields = read_only_fields
 
-    def _get_exists_relation(self, recipe_object, relation_name):
+    def _verify_relation_presence(self, recipe_object, relation_name):
         request = self.context.get("request")
         return (
                 request
@@ -58,10 +58,10 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         )
 
     def get_is_favorite(self, recipe_object):
-        return self._get_exists_relation(recipe_object, "favoriterecipes")
+        return self._verify_relation_presence(recipe_object, "favoriterecipes")
 
     def get_is_in_shopping_cart(self, recipe_object):
-        return self._get_exists_relation(recipe_object, "shoppingcarts")
+        return self._verify_relation_presence(recipe_object, "shoppingcarts")
 
 
 class WriteRecipeSerializer(serializers.ModelSerializer):

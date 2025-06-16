@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.response import Response
 
-from api.pagination import PaginationSite
+from api.pagination import PaginationClass
 from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer
 from api.serializers.subscriptions import RecipesWithUserSerializer
 
@@ -16,17 +16,15 @@ class UserViewset(DjoserUserViewSet):
     """Вьюсет пользователя"""
 
     queryset = UserModel.objects.all()
-    pagination_class = PaginationSite
+    permission_classes = [AllowAny]
+    pagination_class = PaginationClass
     serializer_class = ProfileUserSerializer
 
-    def get_permissions(self):
-        allow_any_actions = set(["retrieve"])
-        if self.action in allow_any_actions:
-            self.permission_classes = [AllowAny]
-        else:
-            self.permission_classes = [IsAuthenticated]
-
-        return super().get_permissions()
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated]
+            )
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
     @action(
         methods=["put", "delete"],
@@ -60,7 +58,7 @@ class UserViewset(DjoserUserViewSet):
         detail=False,
         permission_classes=[IsAuthenticated],
         serializer_class=RecipesWithUserSerializer,
-        pagination_class=PaginationSite,
+        pagination_class=PaginationClass,
     )
     def subscriptions(self, request):
         queryset = UserModel.objects.filter(followers__user_from=request.user)

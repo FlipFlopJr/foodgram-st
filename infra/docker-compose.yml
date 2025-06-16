@@ -3,15 +3,15 @@ version: "3.3"
 
 services:
   frontend:
-    container_name: foodgram-front
+    container_name: front_app
     build: ../frontend
     volumes:
       - ../frontend/:/app/result_build/
     networks:
-      - foodgram_network
+      - app_network
 
   postgres:
-    container_name: foodgram-postgres
+    container_name: postgres_db
     image: postgres:17
     environment:
       POSTGRES_DB: ${DB_NAME}
@@ -22,15 +22,15 @@ services:
     volumes:
       - .pgdata:/var/lib/postgresql/data
     networks:
-      - foodgram_network
+      - app_network
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: [ "CMD", "pg_isready", "-U", "postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
-    container_name: foodgram-backend
+    container_name: backend_app
     build:
       context: ../backend/
       dockerfile: Dockerfile
@@ -49,13 +49,13 @@ services:
     ports:
       - 8000:8000
     networks:
-      - foodgram_network
+      - app_network
     volumes:
       - media_volume:/app/media/
       - static_volume:/app/static/
 
   nginx:
-    container_name: foodgram-proxy
+    container_name: nginx_gateway
     image: nginx:1.25.4-alpine
     ports:
       - 80:80
@@ -66,12 +66,12 @@ services:
       - static_volume:/var/html/static/
       - media_volume:/var/html/media/
     networks:
-      - foodgram_network
+      - app_network
     depends_on:
       - backend
 
 networks:
-  foodgram_network:
+  app_network:
     driver: bridge
     ipam:
       config:

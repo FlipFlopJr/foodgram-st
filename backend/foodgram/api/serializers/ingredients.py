@@ -15,7 +15,7 @@ class IngredientRecipeReadSerializer(serializers.ModelSerializer):
     """Сериализатор для чтения ингредиентов рецептов"""
 
     id = serializers.IntegerField(source="ingredient.id")
-    measurement_unit = serializers.CharField(
+    unit_of_measure = serializers.CharField(
         source="ingredient.unit_of_measure"
     )
     name = serializers.CharField(source="ingredient.name")
