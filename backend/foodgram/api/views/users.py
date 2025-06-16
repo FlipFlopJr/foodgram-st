@@ -1,33 +1,32 @@
 from djoser.views import UserViewSet as DjoserUserViewSet
 from django.shortcuts import get_object_or_404
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
 
-from api.pagination import SitePagination
-from api.serializers.users import (
-    UserProfileSerializer,
-    UserAvatarSerializer,
-    UserWithRecipesSerializer,
-)
-from recipes.models import User, Subscription
+from api.pagination import PaginationSite
+from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer
+from api.serializers.subscriptions import RecipesWithUserSerializer
+
+from users.models import UserModel, SubscriptionModel
 
 
-class UserViewSet(DjoserUserViewSet):
-    """User viewset"""
+class UserViewset(DjoserUserViewSet):
+    """Вьюсет пользователя"""
 
-    queryset = User.objects.all()
-    pagination_class = SitePagination
-    serializer_class = UserProfileSerializer
-    permission_classes = [AllowAny]
+    queryset = UserModel.objects.all()
+    pagination_class = PaginationSite
+    serializer_class = ProfileUserSerializer
 
-    @action(
-        detail=False, methods=["get"], permission_classes=[IsAuthenticated]
-    )
-    def me(self, request):
-        return super().me(request)
+    def get_permissions(self):
+        allow_any_actions = set(["retrieve"])
+        if self.action in allow_any_actions:
+            self.permission_classes = [AllowAny]
+        else:
+            self.permission_classes = [IsAuthenticated]
+
+        return super().get_permissions()
 
     @action(
         methods=["put", "delete"],
@@ -38,7 +37,7 @@ class UserViewSet(DjoserUserViewSet):
     def avatar(self, request):
         current_user = request.user
         if request.method == "PUT":
-            serializer = UserAvatarSerializer(
+            serializer = AvatarUserSerializer(
                 current_user,
                 data=request.data,
                 partial=True,
@@ -60,47 +59,59 @@ class UserViewSet(DjoserUserViewSet):
     @action(
         detail=False,
         permission_classes=[IsAuthenticated],
-        serializer_class=UserWithRecipesSerializer,
-        pagination_class=SitePagination,
+        serializer_class=RecipesWithUserSerializer,
+        pagination_class=PaginationSite,
     )
     def subscriptions(self, request):
-        """Returns users that current user is subscribed to."""
-        subscribed_users = User.objects.filter(
-            authors__user=request.user
-        ).prefetch_related("recipes")
+        queryset = UserModel.objects.filter(followers__user_from=request.user)
+        page = self.paginate_queryset(queryset)
 
-        paginated_users = self.paginate_queryset(subscribed_users)
-        serializer = self.get_serializer(paginated_users, many=True)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-        return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(
         detail=True,
         methods=["post", "delete"],
         permission_classes=[IsAuthenticated],
-        serializer_class=UserWithRecipesSerializer,
+        serializer_class=RecipesWithUserSerializer,
     )
     def subscribe(self, request, id=None):
-        author = get_object_or_404(User, id=id)
+        user_to = get_object_or_404(UserModel, id=id)
         current_user = request.user
 
         if request.method == "POST":
-            if current_user == author:
-                raise ValidationError("Cannot subscribe to yourself")
+            if current_user == user_to:
+                return Response(
+                    {"errors": "Cannot subscribe to yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            subscription, created = Subscription.objects.get_or_create(
-                user=current_user, author=author
+            subscription, created = SubscriptionModel.objects.get_or_create(
+                user_from=current_user, user_to=user_to
             )
 
             if not created:
-                raise ValidationError(
-                    "You are already subscribed to this user"
+                return Response(
+                    {"errors": "You are already subscribed to this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            serializer = self.get_serializer(author)
+            serializer = self.get_serializer(user_to)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        get_object_or_404(
-            Subscription, user=current_user, author=author
+        if not SubscriptionModel.objects.filter(
+                user_from=current_user, user_to=user_to
+        ).exists():
+            return Response(
+                {"errors": "You are not subscribed to this user"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        SubscriptionModel.objects.filter(
+            user_from=current_user, user_to=user_to
         ).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

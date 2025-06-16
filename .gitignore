@@ -1,7 +1,6 @@
 frontend/node_modules
 infra/frontend/build
 .env
-infra/.pgdata
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -31,6 +30,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+infra/.pgdata
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

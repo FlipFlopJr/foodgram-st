@@ -3,14 +3,14 @@ import json
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from recipes.models import Ingredient
+from recipes.models import IngredientModel
 
 
 class Command(BaseCommand):
-    help = "Load ingredients from JSON file"
+    help = "Import ingredients from a JSON file"
 
     def add_arguments(self, parser):
-        parser.add_argument("file_path", type=str, help="Path to JSON file")
+        parser.add_argument("file_path", type=str, help="JSON file path")
 
     def handle(self, *args, **options):
         file_path = options["file_path"]
@@ -20,32 +20,31 @@ class Command(BaseCommand):
                 data = json.load(file)
 
             with transaction.atomic():
-                ingredients_to_create = [
-                    Ingredient(
+                ingredients = [
+                    IngredientModel(
                         name=item["name"].lower(),
-                        measurement_unit=item["measurement_unit"].lower(),
+                        unit_of_measure=item["unit_of_measure"].lower(),
                     )
                     for item in data
                 ]
 
-                # Используем bulk_create для эффективной вставки
-                Ingredient.objects.bulk_create(
-                    ingredients_to_create,
+                IngredientModel.objects.bulk_create(
+                    ingredients,
                     ignore_conflicts=True,
                 )
 
-            total_ingredients = len(ingredients_to_create)
+            total_count_ingredients = len(ingredients)
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Successfully loaded {total_ingredients} ingredients"
+                    f"✅ Loaded {total_count_ingredients} ingredients successfully"
                 )
             )
 
         except FileNotFoundError:
-            self.stdout.write(self.style.ERROR(f"File {file_path} not found"))
+            self.stdout.write(self.style.ERROR(f"Oops! We couldn’t find {file_path}"))
         except json.JSONDecodeError:
             self.stdout.write(
-                self.style.ERROR(f"File {file_path} is not valid JSON")
+                self.style.ERROR(f"We couldn't read {file_path} - it's not in the correct JSON format.")
             )
         except Exception as e:
             self.stdout.write(

@@ -1,42 +1,42 @@
 from rest_framework import serializers
 
-from recipes.models import Ingredient, RecipeIngredient
+from recipes.models import IngredientModel, RecipeIngredientModel
 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    """Serializer for creating and updating ingredients"""
+    """Сериализатор для создания и изменения ингредиентов"""
 
     class Meta:
-        model = Ingredient
-        fields = ("id", "name", "measurement_unit")
+        fields = ("id", "name", "unit_of_measure")
+        model = IngredientModel
 
 
-class RecipeIngredientReadSerializer(serializers.ModelSerializer):
-    """Serializer for reading ingredient recipes"""
+class IngredientRecipeReadSerializer(serializers.ModelSerializer):
+    """Сериализатор для чтения ингредиентов рецептов"""
 
     id = serializers.IntegerField(source="ingredient.id")
-    name = serializers.CharField(source="ingredient.name")
     measurement_unit = serializers.CharField(
-        source="ingredient.measurement_unit"
+        source="ingredient.unit_of_measure"
     )
+    name = serializers.CharField(source="ingredient.name")
 
     class Meta:
-        model = RecipeIngredient
-        fields = ("id", "name", "measurement_unit", "amount")
+        model = RecipeIngredientModel
+        fields = ("id", "name", "unit_of_measure", "count")
 
 
-class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
-    """Serializer for writing ingredient recipes"""
+class IngredientRecipeWriteSerializer(serializers.ModelSerializer):
+    """Сериализатор для записи ингредиентов и рецептов"""
 
     id = serializers.PrimaryKeyRelatedField(
-        queryset=Ingredient.objects.all(),
+        queryset=IngredientModel.objects.all(),
         source="ingredient",
     )
-    amount = serializers.IntegerField(
+    count = serializers.IntegerField(
         required=True,
         min_value=1,
     )
 
     class Meta:
-        model = RecipeIngredient
-        fields = ("id", "amount")
+        model = RecipeIngredientModel
+        fields = ("id", "count")

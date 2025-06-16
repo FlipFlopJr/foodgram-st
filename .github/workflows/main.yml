@@ -1,4 +1,4 @@
-name: main foodgram workflow
+name: foodgram workflow
 
 on:
   push:
@@ -7,45 +7,45 @@ on:
 
 jobs:
   backend-tests:
-    name: Backend tests
+    name: tests of backend
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone repository
+      - name: Clone the rep
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Install python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      - name: Install backend dependencies
+      - name: Install back requirements
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
 
-      - name: Checks PEP8 with Flake8
+      - name: Format PEP8 with Flake8
         run: |
           cd backend
           pip install flake8
           flake8 . --max-line-length=92
 
-      - name: Checks Backend Tests
+      - name: Backend Tests
         run: |
           cd backend/foodgram
           python manage.py test
 
   docker-build:
-    name: Check Docker Image
+    name: Get up Docker Image
     runs-on: ubuntu-latest
 
     steps:
-      - name: Clone repository
+      - name: Clone the repo
         uses: actions/checkout@v4
 
-      - name: Check Backend Build
+      - name: Check Build Of Backend
         run: docker build -t foodgram-backend-test ./backend
 
-      - name: Check Frontend Build
+      - name: Check Build Of Frontend
         run: docker build -t foodgram-frontend-test ./frontend

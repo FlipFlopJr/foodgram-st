@@ -1,12 +1,12 @@
-import base64
 from rest_framework import serializers
-
 from django.core.files.base import ContentFile
 
+import base64
 
-class Base64ImageField(serializers.ImageField):
+
+class Base64Field(serializers.ImageField):
     def to_internal_value(self, data):
-        if isinstance(data, str) and data.startswith("data:image"):
+        if data.startswith("data:image") and isinstance(data, str):
             if data.startswith("data:image"):
                 format, imgstr = data.split(";base64,")
                 ext = format.split("/")[-1]

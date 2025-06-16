@@ -1,37 +1,37 @@
 from django_filters.rest_framework import FilterSet, filters
 
-from recipes.models import Ingredient, Recipe
+from recipes.models import IngredientModel, RecipeModel
 
 
-class IngredientFilter(FilterSet):
-    """Filter for Ingredient model."""
+class FilterIngredientModel(FilterSet):
+    """Фильтр для модели ингридиентов"""
 
     name = filters.CharFilter(field_name="name", lookup_expr="istartswith")
 
     class Meta:
-        model = Ingredient
-        fields = ["name"]
+        model = IngredientModel
+        fields = ("name")
 
 
-class RecipeFilter(FilterSet):
-
+class FilterRecipeModel(FilterSet):
+    """Фильтр для модели рецептов"""
     author = filters.NumberFilter(field_name="author__id")
-    is_favorited = filters.BooleanFilter(method="filter_is_favorited")
-    is_in_shopping_cart = filters.BooleanFilter(
-        method="filter_is_in_shopping_cart"
+    shopping_cart = filters.BooleanFilter(
+        method="filter_of_shopping_cart"
     )
+    is_favorite = filters.BooleanFilter(method="filter_is_favorite")
 
     class Meta:
-        model = Recipe
-        fields = ["author", "is_favorited", "is_in_shopping_cart"]
+        model = RecipeModel
+        fields = ["author", "is_favorite", "shopping_cart"]
 
-    def filter_is_favorited(self, recipes, name, value):
+    def filter_is_favorite(self, recipes, name, value):
         current_user = self.request.user
         if current_user.is_authenticated and value:
             return recipes.filter(favoriterecipes__user=current_user)
         return recipes
 
-    def filter_is_in_shopping_cart(self, recipes, name, value):
+    def filter_of_shopping_cart(self, recipes, name, value):
         current_user = self.request.user
         if current_user.is_authenticated and value:
             return recipes.filter(shoppingcarts__user=current_user)
