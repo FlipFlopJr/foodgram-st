@@ -6,8 +6,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from api.pagination import PaginationClass
-from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer
-from api.serializers.subscriptions import RecipesWithUserSerializer
+from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer, RecipesWithUserSerializer
 
 from users.models import UserModel, SubscriptionModel
 
@@ -20,8 +19,7 @@ class UserViewset(DjoserUserViewSet):
     pagination_class = PaginationClass
     serializer_class = ProfileUserSerializer
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated]
-            )
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
@@ -61,15 +59,12 @@ class UserViewset(DjoserUserViewSet):
         pagination_class=PaginationClass,
     )
     def subscriptions(self, request):
-        queryset = UserModel.objects.filter(followers__user_from=request.user)
-        page = self.paginate_queryset(queryset)
-
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        subscribed_users = UserModel.objects.filter(
+            authors__user=request.user
+        ).prefetch_related("recipes")
+        paginated_users = self.paginate_queryset(subscribed_users)
+        serializer = self.get_serializer(paginated_users, many=True)
+        return self.get_paginated_response(serializer.data)
 
     @action(
         detail=True,
@@ -78,38 +73,35 @@ class UserViewset(DjoserUserViewSet):
         serializer_class=RecipesWithUserSerializer,
     )
     def subscribe(self, request, id=None):
-        user_to = get_object_or_404(UserModel, id=id)
+        from rest_framework.exceptions import ValidationError
+
+        author = get_object_or_404(UserModel, id=id)
         current_user = request.user
 
         if request.method == "POST":
-            if current_user == user_to:
-                return Response(
-                    {"errors": "Cannot subscribe to yourself"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if current_user == author:
+                raise ValidationError("You can't subscribe to yourself")
 
             subscription, created = SubscriptionModel.objects.get_or_create(
-                user_from=current_user, user_to=user_to
+                user=current_user, author=author
             )
 
             if not created:
-                return Response(
-                    {"errors": "You are already subscribed to this user"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                raise ValidationError(
+                    "You have already subscribed to this user"
+
                 )
 
-            serializer = self.get_serializer(user_to)
+            serializer = self.get_serializer(author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        if not SubscriptionModel.objects.filter(
-                user_from=current_user, user_to=user_to
-        ).exists():
-            return Response(
-                {"errors": "You are not subscribed to this user"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        subscription = SubscriptionModel.objects.filter(
+            user=current_user, author=author
+        ).first()
 
-        SubscriptionModel.objects.filter(
-            user_from=current_user, user_to=user_to
-        ).delete()
+        if not subscription:
+            raise ValidationError("You haven't subscribed to this user yet")
+
+        subscription.delete()
+
         return Response(status=status.HTTP_204_NO_CONTENT)

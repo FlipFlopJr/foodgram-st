@@ -1,6 +1,3 @@
-version: "3.3"
-
-
 services:
   frontend:
     container_name: front_app

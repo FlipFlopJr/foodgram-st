@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import RegexValidator
 from django.db import models
 
 
@@ -11,6 +12,20 @@ class UserModel(AbstractUser):
         "avatar", upload_to="avatars/", blank=True, null=True
     )
     email = models.EmailField("email", unique=True, max_length=254)
+    username = models.CharField("username",
+                                max_length=150,
+                                unique=True,
+                                validators=[
+                                    RegexValidator(
+                                        regex=(r"^[\w.@+-]+$"),
+                                        message=(
+                                            "username must contains only letters, "
+                                            "digits and signs @/./+/-/_"
+                                        ),
+                                        code="invalid_username",
+                                    )
+                                ],
+                                )
 
     REQUIRED_FIELDS = ["username", "first_name", "surname"]
     USERNAME_FIELD = "email"
@@ -21,29 +36,34 @@ class UserModel(AbstractUser):
         ordering = ["username"]
 
     def __str__(self):
-        return str(self.email)
+        return self.email
 
 
 class SubscriptionModel(models.Model):
     """Модель подписки"""
 
-    user_to = models.ForeignKey(
-        UserModel, on_delete=models.CASCADE, related_name="followers"
+    author = models.ForeignKey(
+        UserModel,
+        on_delete=models.CASCADE,
+        related_name="authors",
+        verbose_name="Автор",
     )
-
-    user_from = models.ForeignKey(
-        UserModel, on_delete=models.CASCADE, related_name="following"
+    user = models.ForeignKey(
+        UserModel,
+        on_delete=models.CASCADE,
+        related_name="followers",
+        verbose_name="Подписчик",
     )
 
     class Meta:
-        ordering = ["user_from"]
-        verbose_name = "subscription"
-        verbose_name_plural = "subscriptions"
+        ordering = ("user",)
+        verbose_name = "Subscription"
+        verbose_name_plural = "Subscriptions"
         constraints = [
             models.UniqueConstraint(
-                fields=["user_from", "user_to"], name="unique_subscription"
+                fields=["user", "author"], name="unique_subscription"
             )
         ]
 
     def __str__(self):
-        return f"{self.user_from} follows {self.user_to}"
+        return f"{self.user} follows {self.author}"

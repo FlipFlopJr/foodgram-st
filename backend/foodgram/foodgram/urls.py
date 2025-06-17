@@ -8,9 +8,8 @@ from api.views.short_link import short_link_redirect
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("api.urls")),
-    path(
-        "s/<int:recipe_id>/", short_link_redirect, name="short-link-redirect"
-    ),
+    path("", include("recipes.urls")),
+
 ]
 
 if settings.DEBUG:

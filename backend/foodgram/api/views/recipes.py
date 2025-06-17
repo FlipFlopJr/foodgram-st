@@ -15,8 +15,8 @@ from recipes.models import RecipeModel, FavoriteRecipeModel, ShoppingCart
 from api.serializers.recipes import (
     ReadRecipeSerializer,
     WriteRecipeSerializer,
-    ShortRecipeSerializer,
 )
+from api.serializers.users import ShortRecipeSerializer
 from api.permissions import ReadOnlyOrIsAuthor
 from api.pagination import PaginationClass
 from api.filters import FilterRecipeModel
@@ -41,7 +41,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
     @action(methods=["get"], detail=True, url_path="get-link")
-    def link_to_recipe(self, request, pk):
+    def get_link_to_recipe(self, request, pk):
         get_object_or_404(RecipeModel, pk=pk)
         relative_link = reverse("recipes:short-link-redirect", args=[pk])
         absolute_link = request.build_absolute_uri(relative_link)

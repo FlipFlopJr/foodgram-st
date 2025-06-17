@@ -13,14 +13,6 @@ from api.serializers.fields import Base64Field
 User = get_user_model()
 
 
-class ShortRecipeSerializer(serializers.ModelSerializer):
-    """Сериализатор для чтения сокращенных деталей"""
-
-    class Meta:
-        model = RecipeModel
-        fields = ("id", "name", "image", "time_of_cooking")
-
-
 class ReadRecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для чтения деталей рецепта"""
 
@@ -60,7 +52,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
     def get_is_favorite(self, recipe_object):
         return self._verify_relation_presence(recipe_object, "favoriterecipes")
 
-    def get_is_in_shopping_cart(self, recipe_object):
+    def get_of_shopping_cart(self, recipe_object):
         return self._verify_relation_presence(recipe_object, "shoppingcarts")
 
 
@@ -105,16 +97,15 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         return ingredients_info
 
     def _create_ingredients_recipe(self, recipe, ingredients_info):
-        RecipeIngredientModel.objects.bulk_create(
-            [
-                RecipeIngredientModel(
-                    ingredient=ingredient_data["ingredient"],
-                    amount=ingredient_data["amount"],
-                    recipe=recipe
-                )
-                for ingredient_data in ingredients_info
-            ]
-        )
+        recipes_ingredient = [
+            RecipeIngredientModel(
+                recipe=recipe,
+                ingredient=ingredient_data["ingredient"],
+                count=ingredient_data["count"],
+            )
+            for ingredient_data in ingredients_info
+        ]
+        RecipeIngredientModel.objects.bulk_create(recipes_ingredient)
 
     @transaction.atomic
     def create(self, validated_data):

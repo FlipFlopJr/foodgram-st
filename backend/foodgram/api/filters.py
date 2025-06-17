@@ -10,7 +10,7 @@ class FilterIngredientModel(FilterSet):
 
     class Meta:
         model = IngredientModel
-        fields = ("name")
+        fields = ["name", ]
 
 
 class FilterRecipeModel(FilterSet):

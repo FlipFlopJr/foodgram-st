@@ -31,10 +31,10 @@ class RecipeModel(models.Model):
     class Meta:
         verbose_name = "recipe"
         verbose_name_plural = "recipes"
-        ordering = ["name"]
+        ordering = ("name",)
 
     def __str__(self):
-        return str(self.name)
+        return self.name
 
 
 class IngredientModel(models.Model):
@@ -54,6 +54,12 @@ class IngredientModel(models.Model):
         ordering = ["name"]
         verbose_name = "ingredient"
         verbose_name_plural = "ingredients"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "unit_of_measure"],
+                name="unique_ingredient",
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} - {self.unit_of_measure}"
@@ -109,7 +115,12 @@ class RecipeUserRelationModel(models.Model):
 
     class Meta:
         abstract = True
-        ordering = ["user", "recipe"]
+        ordering = ("user", "recipe")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "recipe"], name="unique_%(class)s"
+            )
+        ]
 
     def __str__(self):
         return f"{self.user} - {self.recipe}"
@@ -121,11 +132,6 @@ class FavoriteRecipeModel(RecipeUserRelationModel):
     class Meta:
         verbose_name = "favorite recipe"
         verbose_name_plural = "favorite recipes"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "recipe"], name="unique_user_recipe_favorite"
-            )
-        ]
 
 
 class ShoppingCart(RecipeUserRelationModel):
@@ -134,9 +140,3 @@ class ShoppingCart(RecipeUserRelationModel):
     class Meta:
         verbose_name = "shopping cart item"
         verbose_name_plural = "shopping cart items"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "recipe"],
-                name="unique_user_recipe_shopping_cart",
-            )
-        ]

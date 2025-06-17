@@ -2,6 +2,7 @@ from djoser.serializers import UserSerializer
 from rest_framework import serializers
 
 from users.models import UserModel
+from recipes.models import RecipeModel
 from api.serializers.fields import Base64Field
 
 
@@ -23,15 +24,15 @@ class ProfileUserSerializer(UserSerializer):
             "avatar",
         )
 
-    def get_is_subscription(self, obj):
+    def get_is_subscribed(self, obj):
         request = self.context.get("request")
-        if (
-                request is None
-                or not request.user.is_authenticated
-                or request.user.is_anonymous
-        ):
-            return False
-        return obj.followers.filter(from_user=request.user).exists()
+        return (
+                request is not None
+                and not request.user.is_anonymous
+                and obj.followers.filter(user=request.user).exists()
+                and request.user.is_authenticated
+
+        )
 
     def get_avatar(self, obj):
         if obj.avatar:
@@ -56,3 +57,35 @@ class AvatarUserSerializer(serializers.ModelSerializer):
     class Meta:
         fields = ("avatar",)
         model = UserModel
+
+
+class ShortRecipeSerializer(serializers.ModelSerializer):
+    """Сериалайзер для коротких деталей"""
+
+    class Meta:
+        model = RecipeModel
+        read_only_fields = ("id", "name", "image", "time_of_cooking")
+        fields = read_only_fields
+
+
+class RecipesWithUserSerializer(ProfileUserSerializer):
+    """Сериализатор для рецептов пользователя"""
+
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.IntegerField(
+        source="recipes.count", read_only=True
+    )
+
+    class Meta(ProfileUserSerializer.Meta):
+        fields = ProfileUserSerializer.Meta.fields + (
+            "recipes",
+            "recipes_count",
+        )
+
+    def get_recipes(self, user_obj):
+        request = self.context.get("request")
+        limit = request.query_params.get("recipes_limit") if request else None
+        recipes = user_obj.recipes.all()
+        if limit:
+            recipes = recipes[: int(limit)]
+        return ShortRecipeSerializer(recipes, many=True).data
