@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from api.pagination import PaginationClass
 from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer, RecipesWithUserSerializer
 
-from users.models import UserModel, SubscriptionModel
+from recipes.models import UserModel, SubscriptionModel
 
 
 class UserViewset(DjoserUserViewSet):
