@@ -66,12 +66,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post', 'delete'],
             permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
-        return self._modify_recipe_relation(request, pk, FavoriteRecipeModel, "Recipe is already favorited")
+        return self._modify_recipe_relation(request,
+                                            pk,
+                                            FavoriteRecipeModel,
+                                            "Recipe is already favorited")
 
     @action(detail=True, methods=['post', 'delete'],
             permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
-        return self._modify_recipe_relation(request, pk, ShoppingCart, "Recipe is already in shopping cart")
+        return self._modify_recipe_relation(request,
+                                            pk,
+                                            ShoppingCart,
+                                            "Recipe is already in shopping cart")
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def download_shopping_cart(self, request):

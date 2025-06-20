@@ -80,13 +80,15 @@ class RecipesWithUserSerializer(ProfileUserSerializer):
         )
 
     def get_recipes(self, user_obj):
+        recipes_limit = self.context.get("request").GET.get("recipes_limit")
+        recipes = user_obj.recipes.all()
+        if recipes_limit is not None:
+            try:
+                recipes = recipes[:int(recipes_limit)]
+            except ValueError:
+                pass
+
         return ShortRecipeSerializer(
-            user_obj.recipes.all()[
-            : int(
-                self.context.get("request").GET.get(
-                    "recipes_limit", 10 ** 10
-                )
-            )
-            ],
+            recipes,
             many=True,
         ).data
