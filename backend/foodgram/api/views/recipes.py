@@ -1,21 +1,18 @@
 from datetime import datetime
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError, NotAuthenticated
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.decorators import action
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from django.http import Http404, FileResponse
 from django.db.models import Sum
+
+from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError, NotAuthenticated
+from rest_framework.response import Response
+from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 
 from recipes.models import RecipeModel, FavoriteRecipeModel, ShoppingCart
-from api.serializers.recipes import (
-    ReadRecipeSerializer,
-    WriteRecipeSerializer,
-)
+from api.serializers.recipes import ReadRecipeSerializer, WriteRecipeSerializer
 from api.serializers.users import ShortRecipeSerializer
 from api.permissions import ReadOnlyOrIsAuthor
 from api.pagination import PaginationClass
@@ -27,141 +24,109 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filterset_class = FilterRecipeModel
     pagination_class = PaginationClass
     filter_backends = [DjangoFilterBackend]
-    permission_classes = (ReadOnlyOrIsAuthor,)
+    permission_classes = [ReadOnlyOrIsAuthor]
 
     def get_serializer_class(self):
-        if self.action in ["list", "retrieve"]:
+        if self.action in ('list', 'retrieve'):
             return ReadRecipeSerializer
         return WriteRecipeSerializer
 
     def perform_create(self, serializer):
         user = self.request.user
         if not user.is_authenticated:
-            raise NotAuthenticated("Требуется авторизация для создания рецепта")
+            raise NotAuthenticated(detail="Требуется авторизация для создания рецепта")
         serializer.save(author=user)
 
-    @action(methods=["get"], detail=True, url_path="get-link")
-    def get_link_to_recipe(self, request, pk):
-        if not RecipeModel.objects.filter(pk=pk).exists():
+    @action(detail=True, methods=['get'], url_path='get-link')
+    def get_link_to_recipe(self, request, pk=None):
+        recipe_exists = RecipeModel.objects.filter(pk=pk).exists()
+        if not recipe_exists:
             raise Http404
 
-        return Response(
-            {
-                "short-link": request.build_absolute_uri(
-                    reverse("recipes:short-link-redirect", args=[pk])
-                )
-            }
-        )
+        short_url = request.build_absolute_uri(reverse('recipes:short-link-redirect', args=[pk]))
+        return Response({'short-link': short_url})
 
-    def _handle_recipe_relation(self,
-                                request, recipe_id, model_class, already_exists_message
-                                ):
-
+    def _modify_recipe_relation(self, request, recipe_id, relation_model, error_msg):
         recipe = get_object_or_404(RecipeModel, pk=recipe_id)
+        user = request.user
 
-        current_user = request.user
-
-        if request.method == "POST":
-            _, created = model_class.objects.get_or_create(
-                user=current_user, recipe=recipe
-            )
-
+        if request.method == 'POST':
+            obj, created = relation_model.objects.get_or_create(user=user, recipe=recipe)
             if not created:
-                raise ValidationError({"errors": already_exists_message})
+                raise ValidationError({'errors': error_msg})
+            serializer = ShortRecipeSerializer(recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-            return Response(
-                ShortRecipeSerializer(recipe).data,
-                status=status.HTTP_201_CREATED,
-            )
-
-        get_object_or_404(
-            model_class, user=current_user, recipe=recipe
-        ).delete()
-
+        # DELETE
+        obj = get_object_or_404(relation_model, user=user, recipe=recipe)
+        obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(
-        detail=True,
-        methods=["post", "delete"],
-        permission_classes=[IsAuthenticated],
-    )
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
-        return self._handle_recipe_relation(
-            request, pk, FavoriteRecipeModel, "Recipe is already favorited"
-        )
+        return self._modify_recipe_relation(request, pk, FavoriteRecipeModel, "Recipe is already favorited")
 
-    @action(
-        detail=True,
-        methods=["post", "delete"],
-        permission_classes=[IsAuthenticated],
-    )
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
-        return self._handle_recipe_relation(
-            request, pk, ShoppingCart, "recipe is already in shopping cart"
-        )
+        return self._modify_recipe_relation(request, pk, ShoppingCart, "Recipe is already in shopping cart")
 
-    @action(
-        detail=False, permission_classes=[IsAuthenticated], methods=["get"]
-    )
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def download_shopping_cart(self, request):
-
-        recipes = RecipeModel.objects.filter(shoppingcart_relations__user=request.user)
-
+        user = request.user
+        recipes = RecipeModel.objects.filter(shoppingcart_relations__user=user)
         if not recipes.exists():
-            raise ValidationError({"errors": "Shopping cart is empty"})
+            raise ValidationError({'errors': 'Shopping cart is empty'})
 
-        ingredients = (
-            recipes.values(
-                "ingredients__name", "ingredients__measurement_unit"
-            )
-            .annotate(total_amount=Sum("recipe_ingredients__amount"))
-            .order_by("ingredients__name")
+        aggregated_ingredients = (
+            recipes.values('ingredients__name', 'ingredients__measurement_unit')
+            .annotate(total_amount=Sum('recipe_ingredients__amount'))
+            .order_by('ingredients__name')
         )
 
-        current_date = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        shopping_list = [
+        current_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        lines = [
             "Foodgram - Shopping Cart",
-            f"Date: {current_date} UTC",
-            f"User: {request.user.username}",
+            f"Date: {current_time} UTC",
+            f"User: {user.username}",
             "",
             "Ingredients:",
         ]
 
-        for i, ingredient in enumerate(ingredients, 1):
-            shopping_list.append(
-                f"{i}. {ingredient['ingredients__name'].title()} - "
+        for idx, ingredient in enumerate(aggregated_ingredients, start=1):
+            lines.append(
+                f"{idx}. {ingredient['ingredients__name'].title()} - "
                 f"{ingredient['total_amount']} "
                 f"{ingredient['ingredients__measurement_unit']}"
             )
 
-        shopping_list.append("")
-        shopping_list.append("Recipes:")
+        lines.extend([
+            "",
+            "Recipes:",
+        ])
 
         for recipe in recipes:
-            shopping_list.append(
-                f"- {recipe.name} (Author: {recipe.author.get_full_name()})"
-            )
+            lines.append(f"- {recipe.name} (Author: {recipe.author.get_full_name()})")
 
-        shopping_list.append("")
-        shopping_list.append(
+        lines.extend([
+            "",
             f"Foodgram - Your cooking helper © {datetime.now().year}"
-        )
+        ])
+
+        content = "\n".join(lines)
 
         return FileResponse(
-            ("\n".join(shopping_list)),
+            content,
             as_attachment=True,
-            filename="shopping_list.txt",
-            content_type="text/plain; charset=utf-8",
+            filename='shopping_list.txt',
+            content_type='text/plain; charset=utf-8',
         )
 
     def get_queryset(self):
-        queryset = RecipeModel.objects.all()
+        qs = super().get_queryset()
         user = self.request.user
-        request = self.request
-        is_in_shopping_cart = request.query_params.get("is_in_shopping_cart")
+        param = self.request.query_params.get('is_in_shopping_cart')
 
-        # Если is_in_shopping_cart=1 и пользователь авторизован
-        if is_in_shopping_cart in ("1", "true", "True") and user.is_authenticated:
-            queryset = queryset.filter(shoppingcart_relations__user=user)
+        if param and param.lower() in ('1', 'true') and user.is_authenticated:
+            qs = qs.filter(shoppingcart_relations__user=user)
 
-        return queryset
+        return qs

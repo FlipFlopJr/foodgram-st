@@ -4,21 +4,19 @@ from recipes.models import IngredientModel, RecipeIngredientModel
 
 
 class IngredientSerializer(serializers.ModelSerializer):
-    """Сериализатор для создания и изменения ингредиентов"""
+    """Сериализатор для создания и редактирования ингредиентов"""
 
     class Meta:
-        fields = ("id", "name", "measurement_unit")
         model = IngredientModel
+        fields = ("id", "name", "measurement_unit")
 
 
 class IngredientRecipeReadSerializer(serializers.ModelSerializer):
-    """Сериализатор для чтения ингредиентов рецептов"""
+    """Сериализатор для отображения ингредиентов в рецепте"""
 
-    id = serializers.IntegerField(source="ingredient.id")
-    measurement_unit = serializers.CharField(
-        source="ingredient.measurement_unit"
-    )
-    name = serializers.CharField(source="ingredient.name")
+    id = serializers.IntegerField(source="ingredient.id", read_only=True)
+    name = serializers.CharField(source="ingredient.name", read_only=True)
+    measurement_unit = serializers.CharField(source="ingredient.measurement_unit", read_only=True)
 
     class Meta:
         model = RecipeIngredientModel
@@ -26,16 +24,13 @@ class IngredientRecipeReadSerializer(serializers.ModelSerializer):
 
 
 class IngredientRecipeWriteSerializer(serializers.ModelSerializer):
-    """Сериализатор для записи ингредиентов и рецептов"""
+    """Сериализатор для записи ингредиентов в рецепт"""
 
     id = serializers.PrimaryKeyRelatedField(
-        queryset=IngredientModel.objects.all(),
         source="ingredient",
+        queryset=IngredientModel.objects.all()
     )
-    amount = serializers.IntegerField(
-        required=True,
-        min_value=1,
-    )
+    amount = serializers.IntegerField(min_value=1)
 
     class Meta:
         model = RecipeIngredientModel
