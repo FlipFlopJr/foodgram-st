@@ -17,7 +17,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для чтения деталей рецепта"""
 
     is_in_shopping_cart = serializers.SerializerMethodField(read_only=True)
-    is_favorited  = serializers.SerializerMethodField(read_only=True)
+    is_favorited = serializers.SerializerMethodField(read_only=True)
     ingredients = IngredientRecipeReadSerializer(
         many=True, read_only=True, source="recipe_ingredients"
     )

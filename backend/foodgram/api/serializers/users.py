@@ -92,6 +92,8 @@ class RecipesWithUserSerializer(ProfileUserSerializer):
             ],
             many=True,
         ).data
+
+
 from djoser.serializers import UserSerializer
 from rest_framework import serializers
 

@@ -63,7 +63,6 @@ class UserHasFollowersFilter(admin.SimpleListFilter):
             return queryset.filter(**{f"{self.field}__isnull": True})
 
 
-
 class UserHasSubscriptionsFilter(admin.SimpleListFilter):
     title = "presence of subscriptions"
     parameter_name = "has_subscriptions"

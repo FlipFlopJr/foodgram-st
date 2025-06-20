@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+
 class ReadOnlyOrIsAuthor(BasePermission):
     def has_permission(self, request, view):
         # Разрешаем доступ для безопасных методов (GET, HEAD, OPTIONS)

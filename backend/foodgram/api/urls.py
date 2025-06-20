@@ -10,7 +10,6 @@ router.register(r"users", UserViewset, basename="users")
 router.register(r"ingredients", IngredientViewSet, basename="ingredients")
 router.register(r"recipes", RecipeViewSet, basename="recipes")
 
-
 urlpatterns = [
     path("auth/", include("djoser.urls.authtoken")),
     path("", include(router.urls)),
