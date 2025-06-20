@@ -17,7 +17,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для чтения деталей рецепта"""
 
     is_in_shopping_cart = serializers.SerializerMethodField(read_only=True)
-    is_favorite = serializers.SerializerMethodField(read_only=True)
+    is_favorited  = serializers.SerializerMethodField(read_only=True)
     ingredients = IngredientRecipeReadSerializer(
         many=True, read_only=True, source="recipe_ingredients"
     )
@@ -30,37 +30,33 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
             "author",
             "ingredients",
             "is_in_shopping_cart",
-            "is_favorite",
+            "is_favorited",
             "name",
             "image",
             "text",
-            "time_of_cooking",
+            "cooking_time",
         )
         fields = read_only_fields
 
     def _verify_relation_presence(self, recipe_object, relation_name):
         request = self.context.get("request")
-        return (
-                request
-                and getattr(recipe_object, relation_name)
-                .filter(user=request.user)
-                .exists()
-                and request.user.is_authenticated
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        return getattr(recipe_object, relation_name).filter(user=user).exists()
 
-        )
+    def get_is_favorited(self, recipe_object):
+        return self._verify_relation_presence(recipe_object, "favoriterecipemodel_relations")
 
-    def get_is_favorite(self, recipe_object):
-        return self._verify_relation_presence(recipe_object, "favoriterecipes")
-
-    def get_of_shopping_cart(self, recipe_object):
-        return self._verify_relation_presence(recipe_object, "shoppingcarts")
+    def get_is_in_shopping_cart(self, recipe_object):
+        return self._verify_relation_presence(recipe_object, "shoppingcart_relations")
 
 
 class WriteRecipeSerializer(serializers.ModelSerializer):
     """Сериалайзер для записи деталей рецепта"""
 
     image = Base64Field()
-    time_of_cooking = serializers.IntegerField(min_value=1)
+    cooking_time = serializers.IntegerField(min_value=1)
     ingredients = IngredientRecipeWriteSerializer(many=True, required=True)
 
     class Meta:
@@ -71,7 +67,7 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
             "image",
             "name",
             "text",
-            "time_of_cooking",
+            "cooking_time",
         )
 
     def validate(self, info):
@@ -96,29 +92,30 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
 
         return ingredients_info
 
-    def _create_ingredients_recipe(self, recipe, ingredients_info):
-        recipes_ingredient = [
-            RecipeIngredientModel(
-                recipe=recipe,
-                ingredient=ingredient_data["ingredient"],
-                count=ingredient_data["count"],
-            )
-            for ingredient_data in ingredients_info
-        ]
-        RecipeIngredientModel.objects.bulk_create(recipes_ingredient)
+    def _create_recipe_ingredients(self, recipe, ingredients_data):
+        RecipeIngredientModel.objects.bulk_create(
+            [
+                RecipeIngredientModel(
+                    recipe=recipe,
+                    ingredient=ingredient_data["ingredient"],
+                    amount=ingredient_data["amount"]
+                )
+                for ingredient_data in ingredients_data
+            ]
+        )
 
     @transaction.atomic
     def create(self, validated_data):
         ingredients_info = validated_data.pop("ingredients")
         recipe = super().create(validated_data)
-        self._create_ingredients_recipe(recipe, ingredients_info)
+        self._create_recipe_ingredients(recipe, ingredients_info)
         return recipe
 
     @transaction.atomic
     def update(self, instance, validated_data):
         ingredients_info = validated_data.pop("ingredients")
         instance.recipe_ingredients.all().delete()
-        self._create_ingredients_recipe(instance, ingredients_info)
+        self._create_recipe_ingredients(instance, ingredients_info)
         return super().update(instance, validated_data)
 
     def to_representation(self, recipe):

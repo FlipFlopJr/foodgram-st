@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
 from api.pagination import PaginationClass
 from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer, RecipesWithUserSerializer
@@ -21,8 +22,7 @@ class UserViewset(DjoserUserViewSet):
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def me(self, request):
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        return super().me(request)
 
     @action(
         methods=["put", "delete"],
@@ -73,14 +73,12 @@ class UserViewset(DjoserUserViewSet):
         serializer_class=RecipesWithUserSerializer,
     )
     def subscribe(self, request, id=None):
-        from rest_framework.exceptions import ValidationError
-
         author = get_object_or_404(UserModel, id=id)
         current_user = request.user
 
         if request.method == "POST":
             if current_user == author:
-                raise ValidationError("You can't subscribe to yourself")
+                raise ValidationError("Cannot subscribe to yourself")
 
             subscription, created = SubscriptionModel.objects.get_or_create(
                 user=current_user, author=author
@@ -88,20 +86,16 @@ class UserViewset(DjoserUserViewSet):
 
             if not created:
                 raise ValidationError(
-                    "You have already subscribed to this user"
-
+                    "You are already subscribed to this user"
                 )
 
             serializer = self.get_serializer(author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        subscription = SubscriptionModel.objects.filter(
-            user=current_user, author=author
-        ).first()
-
-        if not subscription:
-            raise ValidationError("You haven't subscribed to this user yet")
-
+        # DELETE
+        subscription = get_object_or_404(
+            SubscriptionModel, user=current_user, author=author
+        )
         subscription.delete()
-
         return Response(status=status.HTTP_204_NO_CONTENT)
+

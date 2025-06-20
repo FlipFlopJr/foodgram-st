@@ -23,7 +23,7 @@ class Command(BaseCommand):
                 ingredients = [
                     IngredientModel(
                         name=item["name"].lower(),
-                        unit_of_measure=item["unit_of_measure"].lower(),
+                        measurement_unit=item["measurement_unit"].lower(),
                     )
                     for item in data
                 ]
@@ -33,10 +33,10 @@ class Command(BaseCommand):
                     ignore_conflicts=True,
                 )
 
-            total_count_ingredients = len(ingredients)
+            total_amount_ingredients = len(ingredients)
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"✅ Loaded {total_count_ingredients} ingredients successfully"
+                    f"✅ Loaded {total_amount_ingredients} ingredients successfully"
                 )
             )
 

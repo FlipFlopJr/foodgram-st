@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
+from django.http import Http404, FileResponse
 from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -35,22 +35,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return WriteRecipeSerializer
 
     def perform_create(self, serializer):
-        if not self.request.user.is_authenticated:
-            raise NotAuthenticated("Authentication needed")
-
-        serializer.save(author=self.request.user)
+        user = self.request.user
+        if not user.is_authenticated:
+            raise NotAuthenticated("Требуется авторизация для создания рецепта")
+        serializer.save(author=user)
 
     @action(methods=["get"], detail=True, url_path="get-link")
     def get_link_to_recipe(self, request, pk):
-        get_object_or_404(RecipeModel, pk=pk)
-        relative_link = reverse("recipes:short-link-redirect", args=[pk])
-        absolute_link = request.build_absolute_uri(relative_link)
+        if not RecipeModel.objects.filter(pk=pk).exists():
+            raise Http404
 
-        return Response({"short-link": absolute_link})
+        return Response(
+            {
+                "short-link": request.build_absolute_uri(
+                    reverse("recipes:short-link-redirect", args=[pk])
+                )
+            }
+        )
 
-    def _process_recipe_connection(self,
-                                   request, recipe_id, model_class, already_exists_message
-                                   ):
+    def _handle_recipe_relation(self,
+                                request, recipe_id, model_class, already_exists_message
+                                ):
 
         recipe = get_object_or_404(RecipeModel, pk=recipe_id)
 
@@ -69,16 +74,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_201_CREATED,
             )
 
-        relation = model_class.objects.filter(
-            user=current_user, recipe=recipe
-        ).first()
+        get_object_or_404(
+            model_class, user=current_user, recipe=recipe
+        ).delete()
 
-        if not relation:
-            raise ValidationError(
-                f"Recipe isn't found in {model_class._meta.verbose_name_plural}"
-            )
-
-        relation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -87,7 +86,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def favorite(self, request, pk=None):
-        return self._process_recipe_connection(
+        return self._handle_recipe_relation(
             request, pk, FavoriteRecipeModel, "Recipe is already favorited"
         )
 
@@ -97,28 +96,25 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def shopping_cart(self, request, pk=None):
-        return self._process_recipe_connection(
+        return self._handle_recipe_relation(
             request, pk, ShoppingCart, "recipe is already in shopping cart"
         )
 
     @action(
         detail=False, permission_classes=[IsAuthenticated], methods=["get"]
     )
-    def install_shopping_cart(self, request):
-        from rest_framework.exceptions import ValidationError
-        from django.http import FileResponse
-        import io
+    def download_shopping_cart(self, request):
 
-        recipes = RecipeModel.objects.filter(shoppingcarts__user=request.user)
+        recipes = RecipeModel.objects.filter(shoppingcart_relations__user=request.user)
 
         if not recipes.exists():
             raise ValidationError({"errors": "Shopping cart is empty"})
 
         ingredients = (
             recipes.values(
-                "ingredients__name", "ingredients__unit_of_measure"
+                "ingredients__name", "ingredients__measurement_unit"
             )
-            .annotate(total_count=Sum("recipe_ingredients__count"))
+            .annotate(total_amount=Sum("recipe_ingredients__amount"))
             .order_by("ingredients__name")
         )
 
@@ -134,8 +130,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         for i, ingredient in enumerate(ingredients, 1):
             shopping_list.append(
                 f"{i}. {ingredient['ingredients__name'].title()} - "
-                f"{ingredient['total_count']} "
-                f"{ingredient['ingredients__unit_of_measure']}"
+                f"{ingredient['total_amount']} "
+                f"{ingredient['ingredients__measurement_unit']}"
             )
 
         shopping_list.append("")
@@ -151,12 +147,21 @@ class RecipeViewSet(viewsets.ModelViewSet):
             f"Foodgram - Your cooking helper © {datetime.now().year}"
         )
 
-        content = ("\n".join(shopping_list)).encode("utf-8")
-        file = io.BytesIO(content)
-
         return FileResponse(
-            file,
+            ("\n".join(shopping_list)),
             as_attachment=True,
             filename="shopping_list.txt",
             content_type="text/plain; charset=utf-8",
         )
+
+    def get_queryset(self):
+        queryset = RecipeModel.objects.all()
+        user = self.request.user
+        request = self.request
+        is_in_shopping_cart = request.query_params.get("is_in_shopping_cart")
+
+        # Если is_in_shopping_cart=1 и пользователь авторизован
+        if is_in_shopping_cart in ("1", "true", "True") and user.is_authenticated:
+            queryset = queryset.filter(shoppingcart_relations__user=user)
+
+        return queryset

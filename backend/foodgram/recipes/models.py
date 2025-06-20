@@ -9,7 +9,7 @@ class UserModel(AbstractUser):
     """Модель пользователя"""
 
     first_name = models.CharField("name", max_length=150)
-    surname = models.CharField("surname", max_length=150)
+    last_name = models.CharField("last_name", max_length=150)
     avatar = models.ImageField(
         "avatar", upload_to="avatars/", blank=True, null=True
     )
@@ -29,7 +29,7 @@ class UserModel(AbstractUser):
                                 ],
                                 )
 
-    REQUIRED_FIELDS = ["username", "first_name", "surname"]
+    REQUIRED_FIELDS = ["username", "first_name", "last_name"]
     USERNAME_FIELD = "email"
 
     class Meta:
@@ -88,7 +88,7 @@ class RecipeModel(models.Model):
         verbose_name="ingredients",
         related_name="recipes",
     )
-    time_of_cooking = models.PositiveIntegerField(
+    cooking_time = models.PositiveIntegerField(
         "time of cooking (minutes)",
         validators=[MinValueValidator(1)],
     )
@@ -111,7 +111,7 @@ class IngredientModel(models.Model):
         max_length=256,
         unique=True,
     )
-    unit_of_measure = models.CharField(
+    measurement_unit = models.CharField(
         "unit of measure",
         max_length=256,
     )
@@ -122,13 +122,13 @@ class IngredientModel(models.Model):
         verbose_name_plural = "ingredients"
         constraints = [
             models.UniqueConstraint(
-                fields=["name", "unit_of_measure"],
+                fields=["name", "measurement_unit"],
                 name="unique_ingredient",
             )
         ]
 
     def __str__(self):
-        return f"{self.name} - {self.unit_of_measure}"
+        return f"{self.name} - {self.measurement_unit}"
 
 
 class RecipeIngredientModel(models.Model):
@@ -146,8 +146,8 @@ class RecipeIngredientModel(models.Model):
         verbose_name="ingredient",
         on_delete=models.CASCADE,
     )
-    count = models.PositiveIntegerField(
-        "count",
+    amount = models.PositiveIntegerField(
+        "amount",
         validators=[MinValueValidator(1)],
     )
 
@@ -159,7 +159,7 @@ class RecipeIngredientModel(models.Model):
     def __str__(self):
         return (
             f"{self.ingredient} - "
-            f"{self.count} {self.ingredient.unit_of_measure}"
+            f"{self.amount} {self.ingredient.measurement_unit}"
         )
 
 

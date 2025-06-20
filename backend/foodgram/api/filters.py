@@ -19,20 +19,20 @@ class FilterRecipeModel(FilterSet):
     shopping_cart = filters.BooleanFilter(
         method="filter_of_shopping_cart"
     )
-    is_favorite = filters.BooleanFilter(method="filter_is_favorite")
+    is_favorited = filters.BooleanFilter(method="filter_is_favorited")
 
     class Meta:
         model = RecipeModel
-        fields = ["author", "is_favorite", "shopping_cart"]
+        fields = ["author", "is_favorited", "shopping_cart"]
 
-    def filter_is_favorite(self, recipes, name, value):
+    def filter_is_favorited(self, recipes, name, value):
         current_user = self.request.user
         if current_user.is_authenticated and value:
-            return recipes.filter(favoriterecipes__user=current_user)
+            return recipes.filter(favoriterecipemodel_relations__user=current_user)
         return recipes
 
     def filter_of_shopping_cart(self, recipes, name, value):
         current_user = self.request.user
         if current_user.is_authenticated and value:
-            return recipes.filter(shoppingcarts__user=current_user)
+            return recipes.filter(shoppingcart_relations__user=current_user)
         return recipes
