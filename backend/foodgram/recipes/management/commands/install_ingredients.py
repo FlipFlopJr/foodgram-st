@@ -44,7 +44,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Oops! We couldn’t find {file_path}"))
         except json.JSONDecodeError:
             self.stdout.write(
-                self.style.ERROR(f"We couldn't read {file_path} - it's not in the correct JSON format.")
+                self.style
+                .ERROR(f"We couldn't read {file_path} - "
+                       f"it's not in the correct JSON format.")
             )
         except Exception as e:
             self.stdout.write(

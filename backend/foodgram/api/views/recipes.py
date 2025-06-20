@@ -43,7 +43,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if not recipe_exists:
             raise Http404
 
-        short_url = request.build_absolute_uri(reverse('recipes:short-link-redirect', args=[pk]))
+        short_url = request.build_absolute_uri(
+            reverse('recipes:short-link-redirect', args=[pk]))
         return Response({'short-link': short_url})
 
     def _modify_recipe_relation(self, request, recipe_id, relation_model, error_msg):
@@ -62,11 +63,13 @@ class RecipeViewSet(viewsets.ModelViewSet):
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
         return self._modify_recipe_relation(request, pk, FavoriteRecipeModel, "Recipe is already favorited")
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
         return self._modify_recipe_relation(request, pk, ShoppingCart, "Recipe is already in shopping cart")
 

@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
 from api.pagination import PaginationClass
-from api.serializers.users import ProfileUserSerializer, AvatarUserSerializer, RecipesWithUserSerializer
+from api.serializers.users import (ProfileUserSerializer,
+                                   AvatarUserSerializer, RecipesWithUserSerializer)
 from recipes.models import UserModel, SubscriptionModel
 
 
@@ -59,7 +60,9 @@ class UserViewset(DjoserUserViewSet):
         pagination_class=PaginationClass,
     )
     def subscriptions(self, request):
-        subscribed_qs = UserModel.objects.filter(authors__user=request.user).prefetch_related("recipes")
+        subscribed_qs = (UserModel.objects
+                         .filter(authors__user=request.user)
+                         .prefetch_related("recipes"))
         page = self.paginate_queryset(subscribed_qs)
         serializer = self.get_serializer(page, many=True)
         return self.get_paginated_response(serializer.data)
@@ -79,7 +82,9 @@ class UserViewset(DjoserUserViewSet):
             if user == author:
                 raise ValidationError("You cannot subscribe to yourself.")
 
-            subscription, created = SubscriptionModel.objects.get_or_create(user=user, author=author)
+            subscription, created = (SubscriptionModel
+                                     .objects
+                                     .get_or_create(user=user, author=author))
             if not created:
                 raise ValidationError("Subscription already exists.")
 

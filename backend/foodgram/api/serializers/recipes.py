@@ -46,7 +46,8 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         return getattr(recipe_object, relation_name).filter(user=user).exists()
 
     def get_is_favorited(self, recipe_object):
-        return self._verify_relation_presence(recipe_object, "favoriterecipemodel_relations")
+        return self._verify_relation_presence(recipe_object,
+                                              "favoriterecipemodel_relations")
 
     def get_is_in_shopping_cart(self, recipe_object):
         return self._verify_relation_presence(recipe_object, "shoppingcart_relations")

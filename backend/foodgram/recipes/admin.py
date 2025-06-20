@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.db.models import Min, Max
 from django.utils.safestring import mark_safe
 from django.contrib.auth.admin import UserAdmin
 
@@ -100,7 +99,10 @@ class UserAdminClass(UserAdmin, RecipesCountMixin):
         "get_number_of_following",
         "get_number_of_followers",
     )
-    list_filter = (UserHasRecipesFilter, UserHasFollowersFilter, UserHasSubscriptionsFilter, "is_active", "is_staff",
+    list_filter = (UserHasRecipesFilter,
+                   UserHasFollowersFilter,
+                   UserHasSubscriptionsFilter,
+                   "is_active", "is_staff",
                    "is_superuser")
     search_fields = ("username", "email", "first_name", "last_name")
     ordering = ("id",)
