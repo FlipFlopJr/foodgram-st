@@ -22,10 +22,13 @@ class RecipesCountMixin:
         return obj.recipes.count()
 
 
-class BaseHasFilter(admin.SimpleListFilter):
+class UserHasRecipesFilter(admin.SimpleListFilter):
+    title = "presence of recipes"
+    parameter_name = "has_recipes"
+    field = "recipes"
     lookups_choices = (
-        ("yes", "Есть"),
-        ("no", "Нет"),
+        ("yes", "Есть рецепты"),
+        ("no", "Нет рецептов"),
     )
 
     def lookups(self, request, model_admin):
@@ -40,16 +43,6 @@ class BaseHasFilter(admin.SimpleListFilter):
             return queryset.filter(**{f"{self.field}__isnull": True})
 
 
-class UserHasRecipesFilter(admin.SimpleListFilter):
-    title = "presence of recipes"
-    parameter_name = "has_recipes"
-    field = "recipes"
-    lookups_choices = (
-        ("yes", "Есть рецепты"),
-        ("no", "Нет рецептов"),
-    )
-
-
 class UserHasFollowersFilter(admin.SimpleListFilter):
     title = "presence of followers"
     parameter_name = "has_followers"
@@ -57,6 +50,18 @@ class UserHasFollowersFilter(admin.SimpleListFilter):
         ("yes", "Есть подписчики"),
         ("no", "Нет подписчиков"),
     )
+
+    def lookups(self, request, model_admin):
+        return self.lookups_choices
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(
+                **{f"{self.field}__isnull": False}
+            ).distinct()
+        if self.value() == "no":
+            return queryset.filter(**{f"{self.field}__isnull": True})
+
 
 
 class UserHasSubscriptionsFilter(admin.SimpleListFilter):
@@ -67,6 +72,17 @@ class UserHasSubscriptionsFilter(admin.SimpleListFilter):
         ("yes", "Есть подписки"),
         ("no", "Нет подписок"),
     )
+
+    def lookups(self, request, model_admin):
+        return self.lookups_choices
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(
+                **{f"{self.field}__isnull": False}
+            ).distinct()
+        if self.value() == "no":
+            return queryset.filter(**{f"{self.field}__isnull": True})
 
 
 @admin.register(UserModel)
@@ -242,7 +258,7 @@ class AdminRecipeModel(admin.ModelAdmin):
 
     @admin.display(description="favorites")
     def get_favorites_count(self, obj):
-        return obj.favoriterecipes.count()
+        return obj.favoriterecipemodel_relations.count()
 
     @admin.display(description="ingredients")
     @mark_safe
@@ -271,8 +287,6 @@ class AdminIngredientModel(admin.ModelAdmin, RecipesCountMixin):
     list_filter = ("name", "measurement_unit",)
     search_fields = ("name", "measurement_unit")
     list_display = ("name", "measurement_unit", "get_recipes_count")
-
-
 
 
 @admin.register(FavoriteRecipeModel, ShoppingCart)
